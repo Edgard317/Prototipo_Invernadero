@@ -1,0 +1,282 @@
+#define ONE_WIRE_BUS 14        
+//**********************************************************************************************
+#include <Wire.h>
+#include <BH1750.h>
+//BH1750 lightMeter;
+BH1750 lightMeter(0x23);
+float lux;
+float GAS;
+//#define _DEBUG_  // muestra el estado de la conexion
+#define _DISABLE_TLS_
+//*********************************************************************************************
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <ThingerESP8266.h>
+#include <EEPROM.h>
+#define USERNAME "edleo"
+#define DEVICE_ID "esp8266_a"
+#define DEVICE_CREDENTIAL "fWow7rg1s4%&"
+#define SSID "REP"
+#define SSID_PASSWORD "Invernadero_123"
+ThingerESP8266 thing(USERNAME, DEVICE_ID, DEVICE_CREDENTIAL);
+
+IPAddress ip(192, 168, 1, 11);
+IPAddress gateway(192, 168, 1, 1);
+IPAddress subnet(255, 255, 255, 0);
+IPAddress dns(200, 48, 225 , 130);
+//*********************************************************************************************
+/*Put your SSID & Password*/
+//const char* ssid = "WLAN_FAD0";  // Enter SSID here
+//const char* password = "hGYDgjYspnMge";  //Enter Password here
+
+ESP8266WebServer server(80);
+//***********************memoria eeprom*********************************
+int valor_memoria ;
+int valor_memoria_1 ;
+int valor_memoria_2 ;
+int direccion_memoria;
+int direccion_memoria_1;
+int direccion_memoria_2;
+int eeAddress=0;
+//*********************************************************************************************   
+//*********************************************************************************************             
+#include "DHT.h"     // incluye libreria de sensor de temperatura y humedad DTH
+DHT dht(14, DHT22);
+float Temperature;
+float Humidity;
+//*********************************************************************************************
+//*********************************************************************************************
+float CO2;
+float co2ext;
+int temp_mayor;
+int temp_menor;
+//*********************************************************************************************
+//*********************************************************************************************
+//**********************************************************************
+//******************salidas*********************************************
+int calefactor = 16;
+int ventilador = 0;
+int extractor =  2;
+///**********************************************************************
+//***********************************************************************
+
+//*********************************************************************************************  
+void setup() {
+  WiFi.config(ip, gateway, subnet,dns);
+    pinMode(calefactor,OUTPUT); 
+    pinMode(ventilador,OUTPUT);
+    pinMode(extractor,OUTPUT);
+    digitalWrite(calefactor,HIGH);
+    digitalWrite(ventilador,HIGH);
+    digitalWrite(extractor,HIGH);
+  Wire.begin();
+  lightMeter.begin();
+  dht.begin(); 
+  Serial.begin(9600);  
+ //*********************************************************************************************                
+ //*********************************************************************************************  
+  Serial.println("conectando a: ");
+  Serial.println(SSID);
+  thing.add_wifi(SSID, SSID_PASSWORD);
+  while (WiFi.status() != WL_CONNECTED)//revisa si ya esta conectado al wifi
+  {
+    delay(1000);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi conectado...!");
+  Serial.print("IP: ");  Serial.println(WiFi.localIP());
+
+  server.on("/", handle_OnConnect);
+  server.onNotFound(handle_NotFound);
+
+  server.begin();
+  Serial.println("HTTP servidor iniciado...!! ");
+EEPROM.begin(512); delay(10);
+temp_mayor=EEPROM.read(0); delay(10);
+EEPROM.begin(512); delay(10);
+temp_menor=EEPROM.read(1); delay(10);
+EEPROM.begin(512); delay(10);
+co2ext=EEPROM.read(2); delay(10);
+co2ext=co2ext*100;  
+}
+//***************************************************************************************
+//***************************************************************************************
+void loop() {
+   thing.handle();
+  server.handleClient();
+
+  thing["humedad_aire"] >> [](pson & out) {
+    out =  dht.readHumidity();
+  };
+  thing["temperatura"] >> [](pson & out) {
+    out =  dht.readTemperature() ;
+  };
+  thing["luminosidad"] >> [](pson & out) {
+    out =  lightMeter.readLightLevel();
+  };
+  thing["co2"] >> [](pson & out) {
+    out = GAS;
+  };
+ //**************************************************************************************
+ //**************************************************************************************
+  thing["temperatura_mayor"] << [](pson & in) {
+    if (in.is_empty()) {
+      in = temp_mayor;
+      direccion_memoria=0;      //marca la direccion de memoria
+      valor_memoria=temp_mayor; //alista  el valor a grabar
+      memoria_eeprom();         //escribe variable en memoria
+    }
+    else
+    {
+      temp_mayor = in;
+    }
+  };
+
+  thing["temperatura_menor"] << [](pson & in) {
+    if (in.is_empty()) {
+      in = temp_menor;
+      direccion_memoria_1=1;      
+      valor_memoria_1=temp_menor;
+      memoria_eeprom();//escribe variable en memoria
+    }
+    else
+    {
+      
+      temp_menor = in;
+    }
+  };
+
+  thing["co2_ext"] << [](pson & in) {
+    if (in.is_empty()) {
+      in = co2ext;
+      direccion_memoria_2=2;      //marca la direccion de memoria
+      valor_memoria_2=co2ext/100; //alista  el valor a grabar
+      memoria_eeprom();         //escribe variable en memoria
+      co2ext=co2ext*100;
+    }
+    else
+    {
+      co2ext = in;
+
+    }
+  };
+  //************************************************************************************
+  //************************************************************************************
+    if (Temperature >= temp_mayor)
+    {
+    digitalWrite(ventilador , LOW);
+    //****************envia marcador de estado*****************
+    thing["ventilador"] >> [](pson & out) {
+    out =  1;
+    };
+    //*********************************************************
+    }
+    else
+    {
+    digitalWrite(ventilador , HIGH);
+    //****************envia marcador de estado*****************
+    thing["ventilador"] >> [](pson & out) {
+    out =  0;
+    };
+    }
+    //*********************************************************
+     
+ 
+    if (Temperature <= temp_menor )
+    {
+    //Serial.println("coler ON");
+    digitalWrite(calefactor, LOW);
+    //****************envia marcador de estado*****************
+    thing["calefactor"] >> [](pson & out) {
+    out =  1;
+    };
+    
+    //*********************************************************
+    }
+    else
+    {
+    digitalWrite(calefactor, HIGH);
+    //****************envia marcador de estado*****************
+    thing["calefactor"] >> [](pson & out) {
+    out =  0;
+    };
+    
+    //*********************************************************
+    }
+
+    //****************************************************************
+    //****************************************************************
+    if (GAS<=co2ext )
+    {
+    digitalWrite(extractor, LOW);
+    thing["extractor"] >> [](pson & out) {
+      out =  1;
+    };
+    }
+    else
+    {
+    digitalWrite(extractor, HIGH);
+    thing["extractor"] >> [](pson & out) {
+      out =  0;
+    };
+    }
+    //*****************************************************************
+    //*****************************************************************
+
+  
+}
+
+//***************************************************************************************
+//**********************CALIBRADO DE CO2 ************************************************
+void handle_OnConnect()
+{
+     
+  CO2 = analogRead(A0)+10000;                            //CO2
+  GAS = map(analogRead(A0),0,1023,400,2500);
+  //*************************************************************************************
+  //*************************************************************************************
+  Temperature = dht.readTemperature()*10; // Gets the values of the temperature
+  Humidity = dht.readHumidity()*10; // Gets the values of the humidity 
+  lux = lightMeter.readLightLevel();//*100; 
+  Serial.print("lux:"); Serial.println(lux);
+  Serial.print("co2:");Serial.println(CO2);
+  Serial.print("temp:"); Serial.println(Temperature);
+  Serial.print("hum:");Serial.println(Humidity);
+  //**************************************************************************************
+  ///************ENVIO DE DATOS A SERVIDOR/////////***************************************
+  server.send(200, "text/html", SendHTML(Temperature,Humidity,CO2,lux)); 
+}
+//***************************************************************************************
+
+void handle_NotFound()
+{
+  server.send(404, "text/plain", "Not found");
+}
+//**************************************************************************************
+//**********cuerpo de pagina para envio de dato*****************************************
+  String SendHTML(float Temperaturestat,float Humiditystat,float C02stat,float luxstat)
+  {
+  String ptr = "";
+  ptr +="*";                           // empieza desde aqui
+  ptr +=(int)Temperaturestat;
+  //ptr +="HU4:";
+  ptr +=(int)Humiditystat;
+  ptr +=(int)C02stat;
+  ptr +=(int)luxstat;
+  //ptr +=",</p>";
+  return ptr;
+}
+void memoria_eeprom()
+{
+  EEPROM.begin(512); delay(10);
+  EEPROM.put(direccion_memoria,valor_memoria);  //Grabamos el valor
+  EEPROM.put(direccion_memoria_1,valor_memoria_1);  //Grabamos el valor
+  EEPROM.put(direccion_memoria_2,valor_memoria_2);  //Grabamos el valor
+  eeAddress += sizeof(float);     //Obtener la siguiente posicion para escribir
+  if(eeAddress >= EEPROM.length()) eeAddress = 0;  //Comprobar que no hay desbordamiento
+  EEPROM.commit();
+  delay(10);
+}
+//***************************************************************************************
+//***************************************************************************************
