@@ -1,0 +1,781 @@
+#include <stdint.h>
+//**********************************************************************
+//**********************************************************************
+//#define _DEBUG_  // muestra el estado de la conexion
+#define _DISABLE_TLS_
+#include <ESP8266WiFi.h>
+#include <ThingerESP8266.h>
+#include <EEPROM.h>
+#define USERNAME "suky3220"
+#define DEVICE_ID "esp8266_1"
+#define DEVICE_CREDENTIAL "vvdBik9d#dod"
+#define SSID "REP"                                     //SSID de la RED WIFI
+#define SSID_PASSWORD "Invernadero_123"                // Clave de Red WIFI
+ThingerESP8266 thing(USERNAME, DEVICE_ID, DEVICE_CREDENTIAL);
+
+IPAddress ip(192, 168, 1, 10);                                                    
+IPAddress gateway(192, 168, 1, 1);
+IPAddress subnet(255, 255, 255, 0);
+IPAddress dns(200, 48, 225, 130);
+//**********************************************************************
+//**********************************************************************
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+//**********************************************************************
+//**********************************************************************
+//****************************variables*********************************
+//**********************************************************************
+const char* host = "";            //Declaramos el servidor de conexiÃ³n
+float humedad4;
+float temperatura2;
+float humedad5;
+float temperatura3;
+float luminosidad2;
+float luminosidad3;
+float co22;
+float co23;
+int inttem;
+int inthum;
+int32_t  intlux;
+int32_t intco2;
+float humedad_promedio;
+float temperatura_promedio;
+float luminosidad_promedio;
+float co2_promedio;
+char inChar;
+String string = "";
+String buffer1 = "";
+String buffer2 = "";
+float co2;
+float temperatura;
+float humedad0;
+float suelo1;
+float suelo2;
+float suelo3;
+float luminosidad;
+float ph;
+int temp_mayor;
+int temp_menor;
+float co2ext;
+float co2_div;
+float suelo_1_ext;
+float suelo_2_ext;
+float suelo_3_ext;
+
+//**********************************************************************
+//***********************memoria eeprom*********************************
+
+int valor_memoria ;
+int valor_memoria_1 ;
+int valor_memoria_2 ;
+int valor_memoria_3 ;
+int valor_memoria_4 ;
+int valor_memoria_5 ;
+int direccion_memoria;
+int direccion_memoria_1;
+int direccion_memoria_2;
+int direccion_memoria_3;
+int direccion_memoria_4;
+int direccion_memoria_5;
+int eeAddress=0;
+//**********************************************************************
+//**********************************************************************
+byte sim_temp[8] = {
+  B00100,
+  B01010,
+  B01010,
+  B01010,
+  B01110,
+  B11111,
+  B11111,
+  B01110
+};
+uint8_t sim_hume0[] = {
+  B00100,
+  B00100,
+  B01110,
+  B01110,
+  B11111,
+  B11011,
+  B11011,
+  B01110
+};
+uint8_t sph[] = {
+  B11000,
+  B10100,
+  B11000,
+  B10000,
+  B10101,
+  B00111,
+  B00101,
+  B00000
+};
+
+uint8_t s1[] = {
+  B11111,
+  B01000,
+  B00000,
+  B00000,
+  B10110,
+  B10101,
+  B01101,
+  B00000
+};
+uint8_t s2[] = {
+  B01001,
+  B10101,
+  B10011,
+  B00000,
+  B10110,
+  B10101,
+  B01101,
+  B00000
+};
+uint8_t s3[] = {
+  B01110,
+  B10101,
+  B10101,
+  B00000,
+  B10110,
+  B10101,
+  B01101,
+  B00000
+};
+uint8_t sol[] = {
+  B00100,
+  B10001,
+  B00100,
+  B01110,
+  B01110,
+  B00100,
+  B10001,
+  B00100
+};
+uint8_t co[] = {
+  B01110,
+  B10001,
+  B10001,
+  B01110,
+  B00000,
+  B10001,
+  B10001,
+  B01110
+};
+uint8_t xp[] = {
+  B11111,
+  B00000,
+  B10001,
+  B01010,
+  B00100,
+  B01010,
+  B10001,
+  B00000
+};
+//**********************************************************************
+//Crear el objeto lcd  direcciÃ³n  0x3F y 16 columnas x 2 filas//
+LiquidCrystal_I2C lcd(0x27, 20, 4); //
+
+//**********************************************************************
+//**********************************************************************
+//******************salidas*********************************************
+int electro_valvula_1 = 13;
+int electro_valvula_2 = 14;
+int electro_valvula_3 = 12;
+int calefactor = 15;
+int ventilador = 0;
+int extractor =  2;
+int bomba1 =  16;
+///**********************************************************************
+//***********************************************************************
+//*************************inicio****************************************
+void setup() {
+  Serial.begin(9600);
+  // WiFi.config(ip, gateway, subnet,dns);
+  thing.add_wifi(SSID, SSID_PASSWORD);
+
+  //****************************
+
+  lcd.init();
+  lcd.clear();
+  lcd.backlight();
+  lcd.createChar (0, sim_temp);
+  lcd.createChar (1, sim_hume0);
+  lcd.createChar (2, sph);
+  lcd.createChar (3, co);
+  lcd.createChar (4, s1);
+  lcd.createChar (5, s2);
+  lcd.createChar (6, s3);
+  lcd.createChar (7, sol);
+
+  //********************************************************************
+  //********************************************************************
+    pinMode(electro_valvula_1,OUTPUT);
+    pinMode(electro_valvula_2,OUTPUT);
+    pinMode(electro_valvula_3,OUTPUT);
+    pinMode(calefactor,OUTPUT); 
+    pinMode(bomba1,OUTPUT); 
+    pinMode(ventilador,OUTPUT);
+    pinMode(extractor,OUTPUT);
+    
+    digitalWrite(electro_valvula_1,HIGH);
+    digitalWrite(electro_valvula_2,HIGH);
+    digitalWrite(electro_valvula_3,HIGH);
+    digitalWrite(calefactor,HIGH);
+    digitalWrite(bomba1,HIGH);
+    digitalWrite(ventilador,HIGH);
+    digitalWrite(extractor,HIGH);
+    
+  Serial.print("Conectando a:\t");
+  Serial.println(SSID);
+  //********************************************************************
+  // *******************Esperar a que nos conectemos********************
+  while (WiFi.status() != WL_CONNECTED) {
+
+    lcd.setCursor(0, 1);
+    lcd.print("*BUSCANDO RED WIFI*");
+    delay(2000);
+    lcd.setCursor(0, 1);
+    lcd.print("                   ");
+    delay(2000);
+  }
+  lcd.clear();
+  float rssi = WiFi.RSSI();
+  lcd.setCursor(0, 0);
+  lcd.print("Conectado a Red WiFi");
+  lcd.setCursor(0, 1);
+  lcd.print("ssid:");
+  lcd.print(SSID);
+  lcd.setCursor(0, 2);
+  lcd.print("dbm:");
+  lcd.print(rssi);
+  lcd.setCursor(0, 3);
+  lcd.print("ip:");
+  lcd.print(WiFi.localIP());
+  delay(1000);
+  lcd.clear();
+
+
+  Serial.print("Conectado a:\t");
+  Serial.println(SSID);
+  Serial.print("IP address:\t");
+  Serial.println(WiFi.localIP());
+  Serial.println(WiFi.subnetMask());
+  Serial.println(WiFi.gatewayIP());
+  //Serial.print("dnsServerIP: ");
+  Serial.println(WiFi.dnsIP());
+//***********************************************************************
+//***********************************************************************
+EEPROM.begin(512); delay(10);
+temp_mayor=EEPROM.read(0); delay(10);
+EEPROM.begin(512); delay(10);
+temp_menor=EEPROM.read(1); delay(10);
+EEPROM.begin(512); delay(10);
+co2_div=EEPROM.read(2); delay(10);
+co2_div=co2_div*100;
+EEPROM.begin(512); delay(10);
+suelo_1_ext=EEPROM.read(3); delay(10);
+EEPROM.begin(512); delay(10);
+suelo_2_ext=EEPROM.read(4); delay(10);
+EEPROM.begin(512); delay(10);
+suelo_3_ext=EEPROM.read(5); delay(10);
+Serial.println(co2_div);
+Serial.println(suelo_1_ext);
+Serial.println(suelo_2_ext);
+Serial.println(suelo_3_ext);
+//***********************************************************************
+//***********************************************************************
+}
+//***********************************************************************
+//***********************************************************************
+
+
+void loop()
+{ 
+ thing.handle();
+  //********************************************************************************************************************************************************  
+  //********************************************************************************************************************************************************
+ for(int o=0;o<=20;o++){
+  while (Serial.available()) {
+    //Lectura de caracteres
+    inChar = Serial.read();
+    //Suma de caracteres en variable string
+    string += inChar;
+
+  }
+ while(!Serial.available()) {}
+ Serial.print("dato serial:");
+ Serial.println(string);
+ Serial.println(inChar);
+  
+  buffer2 = string.substring(1, 4);
+  if (buffer2 == "CO2")
+  {
+    buffer1 = string.substring(5, 9);
+    co2 = buffer1.toInt();
+  }
+  if (buffer2 == "TM0")
+  {
+    buffer1 = string.substring(5, 8);
+    temperatura = buffer1.toInt();
+  }
+  if (buffer2 == "HU0")
+  {
+    buffer1 = string.substring(5, 8);
+    humedad0 = buffer1.toInt();
+  }
+  if (buffer2 == "HU1")
+  {
+    buffer1 = string.substring(5, 8);
+    suelo1 = buffer1.toInt();
+  }
+  if (buffer2 == "HU2")
+  {
+    buffer1 = string.substring(5, 8);
+    suelo2 = buffer1.toInt();
+  }
+  if (buffer2 == "HU3")
+  {
+    buffer1 = string.substring(5, 8);
+    suelo3 = buffer1.toInt();
+  }
+
+  if (buffer2 == "PH1")
+  {
+    buffer1 = string.substring(5, 8);
+    ph = buffer1.toInt();
+  }
+  if (buffer2 == "LX0")
+  {
+    buffer1 = string.substring(5, 12);
+    luminosidad = buffer1.toInt();
+  }
+
+
+  string = "";
+  buffer1 = "";
+  buffer2 = "";
+  Serial.flush();
+  delay(50);
+ }
+  co2=co2/10;
+  Serial.println("****************************");
+  Serial.print("*lux:");  Serial.println(luminosidad);
+  Serial.print("*co2:"); Serial.println(co2);
+  Serial.print("*ph:");  Serial.println(ph);
+  Serial.print("*temp:");  Serial.println(temperatura);
+  Serial.print("*hum:");  Serial.println(humedad0);
+  //*******************************************************************************************
+  //****************************************************************  PANTALLA 1  *************************************************************************
+  //*******************************************LCD***********************LCD ******************************************************************************
+  lcd.clear();  
+  lcd.setCursor(0, 0);
+  lcd.setCursor(1,0);lcd.write (byte(0));lcd.print(":");lcd.print(temperatura,1);lcd.print((char)223);lcd.print("C");lcd.setCursor(12,0);
+  lcd.write (byte(1));lcd.print(":");lcd.print(humedad0,0);lcd.setCursor(18,0);lcd.print("%");
+ // lcd.setCursor(10,0);lcd.print("%");lcd.setCursor(13,0); lcd.write(byte(2));lcd.print(ph,0);lcd.print("  ");
+  //********************************************************************************************************************************************************
+  lcd.setCursor(0, 1);
+  lcd.write(byte (1)); lcd.write(byte(4)); lcd.print(suelo1,0);lcd.setCursor(5,1);lcd.print("%");lcd.setCursor(6,1);lcd.write(byte(1));
+  lcd.write(byte (5)); lcd.print(suelo2,0);lcd.setCursor(12,1);lcd.print("%");lcd.setCursor(13,1);lcd.write(byte(1)); lcd.write(byte(6)); 
+  lcd.print(suelo3,0); lcd.setCursor(18,1); lcd.print("%");//lcd.setCursor(17,1);lcd.write(byte (2)); lcd.print(ph, 0);
+  //********************************************************************************************************************************************************
+  lcd.setCursor(0, 2);
+  lcd.write(byte (3));lcd.print(":"); lcd.print(co2,0); lcd.setCursor(5, 2);lcd.print("ppm ");lcd.setCursor(12, 2); lcd.write(byte(2));lcd.print(":");lcd.print(ph,0);lcd.print("  ");
+  //********************************************************************************************************************************************************
+  lcd.setCursor(0, 3);
+  lcd.write (byte(7));lcd.print(luminosidad,0);lcd.print(":");lcd.print(" Lux");
+  //**************************************************************************
+  //**************bucle*********************
+  for(int n=0;n<=2;n++)
+  {
+    
+    host = "192.168.1.11"; //******************cambiar **********************
+    adquision();
+    humedad4 = inthum;
+    temperatura2 = inttem;
+    luminosidad2 = intlux;
+    co22 = map(intco2,0,1023,400,2500);
+    Serial.println(host);
+    Serial.print("temp:"); Serial.println(temperatura2);
+    Serial.print("hum:"); Serial.println(humedad4);
+    Serial.print("lux:"); Serial.println(luminosidad2);
+    Serial.print("co2:"); Serial.println(co22);
+    Serial.print("co2**:"); Serial.println(intco2);
+  //******************************
+  //******************************
+    host = "192.168.1.12"; //******************cambiar *********************
+    adquision();
+    humedad5 = inthum;
+    temperatura3 = inttem;
+    luminosidad3 = intlux;
+    co23 = map(intco2,0,1023,400,2500);
+   Serial.println(host);
+   Serial.print("temp:"); Serial.println(temperatura3);
+   Serial.print("hum:"); Serial.println(humedad5);
+   Serial.print("lux:"); Serial.println(luminosidad3);
+   Serial.print("co2:"); Serial.println( co23);
+  }
+  //*******************************************************************************************
+  //*******************************************************************************************
+  
+  
+  //*********************************************************************************************
+  //************promedio de datos temperatura , humedad c02 y luminosidad***********************
+  temperatura_promedio = ( (temperatura2 / 10) + (temperatura3 / 10)) / 2;
+  humedad_promedio = ( (humedad4 / 10) + (humedad5 / 10)) / 2;
+  luminosidad_promedio = (luminosidad2 + luminosidad3) / 4;
+  co2_promedio = (co22 + co23) / 200;
+  //*********************************************************************************************
+  //*********************************************************************************************
+  //****************************************************************  PANTALLA 2  **************************************************************************
+  //*******************************************LCD***********************LCD *******************************************************************************
+  lcd.clear();  
+  lcd.setCursor(0,0);
+  lcd.setCursor(1,0);lcd.write (byte(0));lcd.write(0xF8);lcd.print(":");lcd.print(temperatura_promedio,1);lcd.print((char)223);lcd.print("C");lcd.setCursor(12,0);lcd.write (byte(1));
+  lcd.write(0xF8);lcd.print(":");lcd.print(humedad_promedio,0);lcd.setCursor(18,0);lcd.print("%");
+  //********************************************************************************************************************************************************
+  lcd.setCursor(0,1);
+  lcd.setCursor(1,1);lcd.write(byte(7));lcd.write(0xF8);lcd.print(":");lcd.print(luminosidad_promedio,0);lcd.print(" Lux");
+  //********************************************************************************************************************************************************
+  lcd.setCursor(0,2);
+  lcd.setCursor(1,2);lcd.print("Co2");lcd.write(0xF8);lcd.print(":");lcd.print(co2_promedio,0);lcd.print(" ppm");
+  //********************************************************************************************************************************************************
+  lcd.setCursor(0, 3);
+  lcd.print("Valores  Promediados");
+  delay(50);
+
+  for(int y=0;y<150;y++){
+    thingio(); //*****************///******//*****funcion para hacer a conexion via IOT
+    
+  }
+    
+}
+//****************************************************************************************************************************
+//****************************************************************************************************************************
+void adquision() {
+  thingio_TX();
+  String line;
+  WiFiClient client;                                 //Inicializamos el cliente (client)
+  Serial.printf("\n[Conectando a %s ... ", host);      //Establecemos la conexiÃ³n con el servidor*** ip del servidor*******
+  if (client.connect(host, 80))
+  {
+    Serial.println("conectado]");
+
+    Serial.println("[Enviando peticion]");             //Enviamos la peticiÃ³n de datos
+    client.print(String("GET /") + " HTTP/1.1\r\n" +
+                 "Host: " + host + "\r\n" +
+                 "Connection: close\r\n" +
+                 "\r\n"
+                );
+    Serial.println("[Respuesta:]");                    //Leemos la respuesta del servidor
+    while (client.connected())
+    {
+      if (client.available())
+      {
+        //**************************************
+        line = client.readStringUntil('\n'); // VARIABLE BUFFER DE ALMACENAMIENTO*******
+        Serial.println(line);
+      }
+    }
+    client.stop();                                   //Finalizamos la conexiÃ³n con el servidor
+    Serial.println("\n[Desconectado]");
+  }
+  else
+  {
+    Serial.println("conexion con el servidor no lograda!]");
+    client.stop();
+  }
+
+  //**************************************************************
+  //********************convertir de string a char **************
+  //************************************************************
+  int str_len = line.length() + 1;
+  char char_array[str_len];
+  char inChar;
+  String buffer1;
+  line.toCharArray(char_array, str_len);
+  //**********************************************************
+  //********devuelve valor por medio de char_array************
+  Serial.println("nuevo valor: ");
+  Serial.println(char_array);
+  //***********************************
+  //*****recorte de la linea string****
+  //*****conversion de string a int****
+  //***********************************
+  String tem = line.substring(1, 4);
+  inttem = tem.toInt();       /// conversion de tipo de vARIBALE
+  String hum = line.substring(4, 7);
+  inthum = hum.toInt();       /// conversion de tipo de vARIBALE
+  String CO2 = line.substring(7, 12);
+  intco2 = CO2.toInt();       /// conversion de tipo de vARIBALE
+  intco2 = intco2-10000;
+  String lux = line.substring(12, 18);
+  intlux = lux.toInt();       /// conversion de tipo de vARIBALE
+
+}
+
+void memoria_eeprom()
+{
+  EEPROM.begin(512); delay(10);
+  EEPROM.put(direccion_memoria,valor_memoria);  //Grabamos el valor
+  EEPROM.put(direccion_memoria_1,valor_memoria_1);  //Grabamos el valor
+  EEPROM.put(direccion_memoria_2,valor_memoria_2);  //Grabamos el valor
+  EEPROM.put(direccion_memoria_3,valor_memoria_3);  //Grabamos el valor
+  EEPROM.put(direccion_memoria_4,valor_memoria_4);  //Grabamos el valor
+  EEPROM.put(direccion_memoria_5,valor_memoria_5);  //Grabamos el valor
+  eeAddress += sizeof(float);     //Obtener la siguiente posicion para escribir
+  if(eeAddress >= EEPROM.length()) eeAddress = 0;  //Comprobar que no hay desbordamiento
+  EEPROM.commit();
+  delay(10);
+}
+//***********************************************************************************************
+//***********************************************************************************************
+void thingio(){
+   
+  //*****************************envia los datos a la nube***************************************
+ 
+  thing["humedad_aire"] >> [](pson & out) {
+    out =  humedad_promedio;
+  };
+  thing["ph"] >> [](pson & out) {
+    out =  ph;
+  };
+  thing["temperatura"] >> [](pson & out) {
+    out =  temperatura ;
+  };
+  thing["luminosidad"] >> [](pson & out) {
+    out =  luminosidad;
+  };
+  thing["co2"] >> [](pson & out) {
+    out =  co2;
+  };
+  thing["hdd_suelo_1"] >> [](pson & out) {
+    out =  suelo1;
+  };
+  thing["hdd_suelo_2"] >> [](pson & out) {
+    out =  suelo2;
+  };
+  thing["hdd_suelo_3"] >> [](pson & out) {
+    out =  suelo3;
+  };
+  thingio_TX();
+}
+  //**********************************************************************************
+  //**********************************************************************************
+  void thingio_TX(){
+  thing.handle();
+  thing["temperatura_mayor"] << [](pson & in) {
+    if (in.is_empty()) {
+      in = temp_mayor;
+      direccion_memoria=0;      //marca la direccion de memoria
+      valor_memoria=temp_mayor; //alista  el valor a grabar
+      memoria_eeprom();         //escribe variable en memoria
+    }
+    else
+    {
+      temp_mayor = in;
+    }
+  };
+
+  thing["temperatura_menor"] << [](pson & in) {
+    if (in.is_empty()) {
+      in = temp_menor;
+      direccion_memoria_1=1;      
+      valor_memoria_1=temp_menor;
+      memoria_eeprom();//escribe variable en memoria
+    }
+    else
+    {
+      
+      temp_menor = in;
+    }
+  };
+
+  thing["co2_ext"] << [](pson & in) {
+    if (in.is_empty()) {
+      in = co2ext;
+     // co2_div = co2ext/100;       // ***********************POSIBLE CAMBIO ********************
+      direccion_memoria_2=2;      //marca la direccion de memoria
+      valor_memoria_2=co2_div; //alista  el valor a grabar
+      memoria_eeprom();         //escribe variable en memoria
+      co2_div=co2_div*100;
+    }
+    else
+    {
+      co2ext = in;
+
+    }
+  };
+
+  thing["suelo_1_ext"] << [](pson & in) {
+    if (in.is_empty()) {
+      in = suelo_1_ext;
+      direccion_memoria_3=3;      //marca la direccion de memoria
+      valor_memoria_3=suelo_1_ext; //alista  el valor a grabar
+      memoria_eeprom();         //escribe variable en memoria
+    }
+    else
+    {
+      suelo_1_ext = in;
+    }
+  };
+
+  thing["suelo_2_ext"] << [](pson & in) {
+    if (in.is_empty()) {
+      in = suelo_2_ext;
+      direccion_memoria_4=4;      //marca la direccion de memoria
+      valor_memoria_4=suelo_2_ext; //alista  el valor a grabar
+      memoria_eeprom();         //escribe variable en memoria
+    }
+    else
+    {
+      suelo_2_ext = in;
+    }
+  };
+
+  thing["suelo_3_ext"] << [](pson & in) {
+    if (in.is_empty()) {
+      in = suelo_3_ext;
+      direccion_memoria_5=5;      //marca la direccion de memoria
+      valor_memoria_5=suelo_3_ext; //alista  el valor a grabar
+      memoria_eeprom();         //escribe variable en memoria
+    }
+    else
+    {
+      suelo_3_ext = in;
+    }
+  };
+  //*****************************************************************************************
+  //**********************************Recepcion de datos IoT*********************************
+  //*****************************************************************************************
+    thing.handle();
+    if (temperatura >= temp_mayor)
+    {
+    digitalWrite(ventilador , LOW);
+    //****************envia marcador de estado*****************
+    thing["ventilador"] >> [](pson & out) {
+    out =  1;
+    };
+    //*********************************************************
+    }
+    else
+    {
+    digitalWrite(ventilador , HIGH);
+    //****************envia marcador de estado*****************
+    thing["ventilador"] >> [](pson & out) {
+    out =  0;
+    };
+    }
+    //*********************************************************
+   if (temperatura <= temp_menor )
+    {
+    //Serial.println("coler ON");
+    digitalWrite(calefactor, LOW);
+    //****************envia marcador de estado*****************
+    thing["calefactor"] >> [](pson & out) {
+    out =  1;
+    };
+    }
+    else
+    {
+    digitalWrite(calefactor, HIGH);
+    //****************envia marcador de estado*****************
+    thing["calefactor"] >> [](pson & out) {
+    out =  0;
+    };
+    }
+
+    //****************************************************************
+    //****************************************************************
+    if (co2>=co2_div )
+    {
+    digitalWrite(extractor, LOW);
+    thing["extractor"] >> [](pson & out) {
+      out =  1;
+    };
+    }
+    else
+    {
+    digitalWrite(extractor, HIGH);
+    thing["extractor"] >> [](pson & out) {
+      out =  0;
+    };
+    }
+
+    //********************************************************************
+    //***********************ACTIVAR ELECTROVALVULAS *********************
+     //*******************************************************************
+    //********************************************************************
+      if (suelo_1_ext <= suelo1 )
+    {digitalWrite(electro_valvula_1, LOW);
+    thing["humedad_suelo_a"] >> [](pson & out) {
+    out =  1;};
+    }
+    else
+    {
+    digitalWrite(electro_valvula_1,HIGH);
+    thing["humedad_suelo_a"] >> [](pson & out) {
+      out =  0;
+    };
+    }
+ 
+    //********************************************************************
+    //***********************ACTIVAR ELECTROVALVULAS *********************
+     //*******************************************************************
+    //********************************************************************
+     if (suelo_2_ext <= suelo2)
+    {
+    digitalWrite(electro_valvula_2, LOW);
+    thing["humedad_suelo_b"] >> [](pson & out) {
+    out =  1;
+    };
+    }
+    else
+    {
+    digitalWrite(electro_valvula_2,HIGH);
+    thing["humedad_suelo_b"] >> [](pson & out) {
+    out =  0;
+    };
+    }
+
+    //********************************************************************
+    //***********************ACTIVAR ELECTROVALVULAS *********************
+     //*******************************************************************
+    //********************************************************************
+     if (suelo_3_ext <= suelo3)
+    {
+    digitalWrite(electro_valvula_3, LOW);
+    thing["humedad_suelo_c"] >> [](pson & out) {
+    out =  1;
+    };
+    }
+    else
+    {
+    digitalWrite(electro_valvula_3,HIGH);
+    thing["humedad_suelo_c"] >> [](pson & out) {
+    out =  0;
+    };
+    }
+    //*****************************************************************
+    //*****************************************************************
+    //***************************************************************** 
+    //*****************************************************************
+    //*****************************************************************
+    //*****************************************************************
+
+    if (suelo_1_ext <= suelo1 || suelo_2_ext <= suelo2 || suelo_3_ext <= suelo3)  // Activar bomba cuando cualquiera 
+    {digitalWrite(bomba1, LOW);}                                                  // de las 3 electrovalvulas se activen
+    else
+    {digitalWrite(bomba1,HIGH);}
+ 
+
+ 
+    //********************************************************************
+    Serial.println("valores_obtenidos");
+    Serial.println(co2ext);
+    Serial.println(co2_div);
+    Serial.println(suelo_1_ext);
+    Serial.println(suelo_2_ext);
+    Serial.println(suelo_3_ext);
+    //********************************************************************
+  
+}
