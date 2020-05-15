@@ -1,0 +1,150 @@
+
+//******************************************************************************
+//******************************************************************************
+#include "DHT.h"     // incluye libreria de sensor de temperatura y humedad DTH
+DHT dht(8, DHT22);
+float PWM_DEMO = 0; /// borrar
+//******************************************************************************
+#include <Wire.h>
+#include <BH1750.h>
+BH1750 lightMeter;
+float lux;
+//******************************************************************************
+//******************************************************************************
+float temperatura;
+float humedad_aire;
+int  humedad_suelo_1;
+int  humedad_suelo_2;
+int  humedad_suelo_3;
+int32_t  CO2;
+float ph;
+float Po;
+char inChar;
+String string = "";
+String buffer1 = "";
+String buffer2 = "";
+//******************************************************************************
+//******************************************************************************
+void setup() {
+
+  pinMode(7, OUTPUT);
+  pinMode(2, INPUT); //aviso
+  digitalWrite(2, LOW);
+  Wire.begin();  //inicializa i2c
+  lightMeter.begin();
+  Serial1.begin(9600);
+  Serial.begin(9600);
+  dht.begin();
+  /*
+    uint8_t mac[6] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05};
+    Ethernet.begin(mac);
+    Serial.print("localIP: ");
+    Serial.println(Ethernet.localIP());
+    Serial.print("subnetMask: ");
+    Serial.println(Ethernet.subnetMask());
+    Serial.print("gatewayIP: ");
+    Serial.println(Ethernet.gatewayIP());
+    Serial.print("dnsServerIP: ");
+    Serial.println(Ethernet.dnsServerIP());
+  */
+}
+
+//******************************************************************************
+//******************************************************************************
+int Y;
+void loop()
+{ 
+  temperatura = dht.readTemperature();
+  humedad_aire = dht.readHumidity();
+  lux = lightMeter.readLightLevel();
+  humedad_suelo_1 = analogRead(A0);
+  humedad_suelo_2 = analogRead(A1);
+  humedad_suelo_3 = analogRead(A2);
+  CO2 = analogRead(A3);
+  CO2 = map(CO2,0,1023,400,2500);
+  humedad_suelo_1 = map(humedad_suelo_1, 0, 1023, 99, 0);
+  humedad_suelo_2 = map(humedad_suelo_2, 0, 1023, 99, 0);
+  humedad_suelo_3 = map(humedad_suelo_3, 0, 1023, 99, 0);
+  Po = analogRead(A4);
+  Po = map(Po, 400, 775, 14.0, 0);
+  switch (Y)
+  {
+    case 1:
+      for(float k=0;k<3;k++)
+        {
+          
+          Serial.print(" CO2:"); Serial.print(CO2); Serial.println();
+          delay(50);
+        }
+      break;
+
+    case 2:
+     for(float k=0;k<3;k++)
+        {
+          
+          Serial.print(" TM0:"); Serial.print(temperatura); Serial.println();        //       Serial.print(" TM0:"); Serial.print(temperatura * 10); Serial.println();
+          delay(50);
+        }
+      break;
+
+    case 3:
+     for(float k=0;k<3;k++)
+        {
+          
+          Serial.print(" HU0:"); Serial.print(humedad_aire); Serial.println();
+          delay(50);
+        }
+      break;
+
+    case 4:
+     for(float k=0;k<3;k++)
+        {
+          
+          Serial.print(" HU1:"); Serial.print( humedad_suelo_1);  Serial.println();
+          delay(50);
+        }
+      break;
+
+    case 5:
+     for(float k=0;k<3;k++)
+        {
+          
+          Serial.print(" HU2:"); Serial.print( humedad_suelo_2);  Serial.println();
+          delay(50);
+        }
+      break;
+
+    case 6:
+     for(float k=0;k<3;k++)
+        {
+          
+          Serial.print(" HU3:"); Serial.print( humedad_suelo_3);  Serial.println();
+          delay(50);
+        }
+      break;
+
+    case 7:
+     for(float k=0;k<3;k++)
+        {
+          
+          Serial.print(" PH1:"); Serial.print( Po); Serial.println();
+          delay(50);
+        }
+      break;
+
+    case 8:
+     for(float k=0;k<3;k++)
+        {
+          
+          Serial.print(" LX0:"); Serial.print( lux); Serial.println();
+          delay(50);
+        }
+      break;
+
+    case 9:
+      Y = 0;
+      break;
+  }
+  Y++;
+}
+
